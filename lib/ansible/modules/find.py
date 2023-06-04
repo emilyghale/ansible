@@ -254,35 +254,18 @@ def pfilter(f, patterns=None, excludes=None, use_regex=False):
         return True
 
     if use_regex:
-        if patterns and not excludes:
-            for p in patterns:
-                r = re.compile(p)
-                if r.match(f):
-                    return True
-
-        elif patterns and excludes:
-            for p in patterns:
-                r = re.compile(p)
-                if r.match(f):
-                    for e in excludes:
-                        r = re.compile(e)
-                        if r.match(f):
-                            return False
-                    return True
+        if patterns:
+            matches = any(re.match(p, f) for p in patterns)
+            if matches and excludes:
+                return not any(re.match(e, f) for e in excludes)
+            return matches
 
     else:
-        if patterns and not excludes:
-            for p in patterns:
-                if fnmatch.fnmatch(f, p):
-                    return True
-
-        elif patterns and excludes:
-            for p in patterns:
-                if fnmatch.fnmatch(f, p):
-                    for e in excludes:
-                        if fnmatch.fnmatch(f, e):
-                            return False
-                    return True
+        if patterns:
+            matches = any(fnmatch.fnmatch(f, p) for p in patterns)
+            if matches and excludes:
+                return not any(fnmatch.fnmatch(f, e) for e in excludes)
+            return matches
 
     return False
 

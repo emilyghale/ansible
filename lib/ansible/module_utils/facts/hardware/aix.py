@@ -21,6 +21,14 @@ import re
 from ansible.module_utils.facts.hardware.base import Hardware, HardwareCollector
 from ansible.module_utils.facts.utils import get_mount_size
 
+def run_command(command):
+    """
+    Run a shell command and return the output, error, and return code.
+    """
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    out, err = process.communicate()
+    rc = process.returncode
+    return rc, out.decode().strip(), err.decode().strip()
 
 class AIXHardware(Hardware):
     """
@@ -62,7 +70,7 @@ class AIXHardware(Hardware):
 
         # FIXME: not clear how to detect multi-sockets
         cpu_facts['processor_count'] = 1
-        rc, out, err = self.module.run_command(
+        rc, out, err = run_command(
             "/usr/sbin/lsdev -Cc processor"
         )
         if out:
@@ -77,7 +85,7 @@ class AIXHardware(Hardware):
                     i += 1
             cpu_facts['processor_cores'] = int(i)
 
-            rc, out, err = self.module.run_command(
+            rc, out, err = run_command(
                 "/usr/sbin/lsattr -El " + cpudev + " -a type"
             )
 
@@ -85,7 +93,7 @@ class AIXHardware(Hardware):
             cpu_facts['processor'] = [data[1]]
 
             cpu_facts['processor_threads_per_core'] = 1
-            rc, out, err = self.module.run_command(
+            rc, out, err = run_command(
                 "/usr/sbin/lsattr -El " + cpudev + " -a smt_threads"
             )
             if out:
@@ -100,7 +108,7 @@ class AIXHardware(Hardware):
     def get_memory_facts(self):
         memory_facts = {}
         pagesize = 4096
-        rc, out, err = self.module.run_command("/usr/bin/vmstat -v")
+        rc, out, err = run_command("/usr/bin/vmstat -v")
         for line in out.splitlines():
             data = line.split()
             if 'memory pages' in line:
@@ -113,7 +121,7 @@ class AIXHardware(Hardware):
         # Device          1M-blocks     Used    Avail Capacity
         # /dev/ada0p3        314368        0   314368     0%
         #
-        rc, out, err = self.module.run_command("/usr/sbin/lsps -s")
+        rc, out, err = run_command("/usr/sbin/lsps -s")
         if out:
             lines = out.splitlines()
             data = lines[1].split()
@@ -127,12 +135,12 @@ class AIXHardware(Hardware):
     def get_dmi_facts(self):
         dmi_facts = {}
 
-        rc, out, err = self.module.run_command("/usr/sbin/lsattr -El sys0 -a fwversion")
+        rc, out, err = run_command("/usr/sbin/lsattr -El sys0 -a fwversion")
         data = out.split()
         dmi_facts['firmware_version'] = data[1].strip('IBM,')
         lsconf_path = self.module.get_bin_path("lsconf")
         if lsconf_path:
-            rc, out, err = self.module.run_command(lsconf_path)
+            rc, out, err = run_command(lsconf_path)
             if rc == 0 and out:
                 for line in out.splitlines():
                     data = line.split(':')
@@ -165,14 +173,14 @@ class AIXHardware(Hardware):
         xargs_path = self.module.get_bin_path("xargs")
         cmd = "%s -o | %s %s -p" % (lsvg_path, xargs_path, lsvg_path)
         if lsvg_path and xargs_path:
-            rc, out, err = self.module.run_command(cmd, use_unsafe_shell=True)
+            rc, out, err = run_command(cmd, use_unsafe_shell=True)
             if rc == 0 and out:
                 vgs_facts['vgs'] = {}
                 for m in re.finditer(r'(\S+):\n.*FREE DISTRIBUTION(\n(\S+)\s+(\w+)\s+(\d+)\s+(\d+).*)+', out):
                     vgs_facts['vgs'][m.group(1)] = []
                     pp_size = 0
                     cmd = "%s %s" % (lsvg_path, m.group(1))
-                    rc, out, err = self.module.run_command(cmd)
+                    rc, out, err = run_command(cmd)
                     if rc == 0 and out:
                         pp_size = re.search(r'PP SIZE:\s+(\d+\s+\S+)', out).group(1)
                         for n in re.finditer(r'(\S+)\s+(\w+)\s+(\d+)\s+(\d+).*', m.group(0)):
@@ -196,7 +204,7 @@ class AIXHardware(Hardware):
         # AIX does not have mtab but mount command is only source of info (or to use
         # api calls to get same info)
         mount_path = self.module.get_bin_path('mount')
-        rc, mount_out, err = self.module.run_command(mount_path)
+        rc, mount_out, err = run_command(mount_path)
         if mount_out:
             for line in mount_out.split('\n'):
                 fields = line.split()
@@ -235,7 +243,7 @@ class AIXHardware(Hardware):
 
         lsdev_cmd = self.module.get_bin_path('lsdev', True)
         lsattr_cmd = self.module.get_bin_path('lsattr', True)
-        rc, out_lsdev, err = self.module.run_command(lsdev_cmd)
+        rc, out_lsdev, err = run_command(lsdev_cmd)
 
         for line in out_lsdev.splitlines():
             field = line.split()
@@ -245,7 +253,7 @@ class AIXHardware(Hardware):
             device_state = field[1]
             device_type = field[2:]
             lsattr_cmd_args = [lsattr_cmd, '-E', '-l', device_name]
-            rc, out_lsattr, err = self.module.run_command(lsattr_cmd_args)
+            rc, out_lsattr, err = run_command(lsattr_cmd_args)
             for attr in out_lsattr.splitlines():
                 attr_fields = attr.split()
                 attr_name = attr_fields[0]

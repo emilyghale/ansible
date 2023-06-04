@@ -392,9 +392,9 @@ def url_filename(url):
 def url_get(module, url, dest, use_proxy, last_mod_time, force, timeout=10, headers=None, tmp_dest='', method='GET', unredirected_headers=None,
             decompress=True, ciphers=None, use_netrc=True):
     """
-    Download data from the url and store in a temporary file.
+    Download data from the URL and store it in a temporary file.
 
-    Return (tempfile, info about the request)
+    Return (temporary file path, request information)
     """
 
     start = datetime.datetime.utcnow()
@@ -405,16 +405,16 @@ def url_get(module, url, dest, use_proxy, last_mod_time, force, timeout=10, head
     if info['status'] == 304:
         module.exit_json(url=url, dest=dest, changed=False, msg=info.get('msg', ''), status_code=info['status'], elapsed=elapsed)
 
-    # Exceptions in fetch_url may result in a status -1, the ensures a proper error to the user in all cases
+    # Exceptions in fetch_url may result in a status -1, which ensures a proper error message to the user in all cases
     if info['status'] == -1:
         module.fail_json(msg=info['msg'], url=url, dest=dest, elapsed=elapsed)
 
     if info['status'] != 200 and not url.startswith('file:/') and not (url.startswith('ftp:/') and info.get('msg', '').startswith('OK')):
         module.fail_json(msg="Request failed", status_code=info['status'], response=info['msg'], url=url, dest=dest, elapsed=elapsed)
 
-    # create a temporary file and copy content to do checksum-based replacement
+    # Create a temporary file and copy the content to enable checksum-based replacement
     if tmp_dest:
-        # tmp_dest should be an existing dir
+        # tmp_dest should be an existing directory
         tmp_dest_is_dir = os.path.isdir(tmp_dest)
         if not tmp_dest_is_dir:
             if os.path.exists(tmp_dest):
@@ -424,15 +424,13 @@ def url_get(module, url, dest, use_proxy, last_mod_time, force, timeout=10, head
     else:
         tmp_dest = module.tmpdir
 
-    fd, tempname = tempfile.mkstemp(dir=tmp_dest)
-
-    f = os.fdopen(fd, 'wb')
     try:
-        shutil.copyfileobj(rsp, f)
+        with tempfile.NamedTemporaryFile(dir=tmp_dest, delete=False) as temp_file:
+            shutil.copyfileobj(rsp, temp_file)
+            tempname = temp_file.name
     except Exception as e:
-        os.remove(tempname)
-        module.fail_json(msg="failed to create temporary content file: %s" % to_native(e), elapsed=elapsed, exception=traceback.format_exc())
-    f.close()
+        module.fail_json(msg="Failed to create temporary content file: %s" % str(e), elapsed=elapsed, exception=traceback.format_exc())
+
     rsp.close()
     return tempname, info
 

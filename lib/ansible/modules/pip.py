@@ -264,12 +264,12 @@ virtualenv:
   sample: "/tmp/virtualenv"
 '''
 
-import argparse
-import os
+#import argparse
+#import os
 import re
 import sys
-import tempfile
-import operator
+#import tempfile
+#import operator
 import shlex
 import traceback
 

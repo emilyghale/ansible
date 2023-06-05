@@ -82,7 +82,7 @@ path:
   sample: "/tmp/ansible.bMlvdk"
 '''
 
-from os import close
+
 from tempfile import mkstemp, mkdtemp
 from traceback import format_exc
 
@@ -102,22 +102,26 @@ def main():
 
     try:
         if module.params['state'] == 'file':
-            handle, path = mkstemp(
+            handle_file, path_file = mkstemp(
                 prefix=module.params['prefix'],
                 suffix=module.params['suffix'],
                 dir=module.params['path'],
             )
-            close(handle)
+            close(handle_file)
         else:
-            path = mkdtemp(
+            path_file = mkdtemp(
                 prefix=module.params['prefix'],
                 suffix=module.params['suffix'],
                 dir=module.params['path'],
             )
 
-        module.exit_json(changed=True, path=path)
+        module.exit_json(changed=True, path=path_file)
+
     except Exception as e:
-        module.fail_json(msg=to_native(e), exception=format_exc())
+        report_error_message = to_native(e)
+        report_error_traceback = format_exc()
+        module.fail_json(msg=report_error_message, exception=report_error_traceback)
+
 
 
 if __name__ == '__main__':
